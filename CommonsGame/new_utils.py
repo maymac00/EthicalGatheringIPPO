@@ -31,7 +31,7 @@ elif MAP_NAME == "small":
 agent_x_position = len(current_map) - 2
 agent_y_position = len(current_map[0])
 
-print(agent_x_position, agent_y_position)
+# (agent_x_position, agent_y_position)
 
 for x in range(2, 2 + agent_x_position):
     for y in range(agent_y_position):
@@ -57,7 +57,7 @@ apple_indices = []
 for pos in positions_with_apples:
     apple_indices.append(agent_y_position*(pos[0]-2)+pos[1])
 
-print(apple_indices)
+# print(apple_indices)
 agent_num_apples = [0, SURVIVAL_THRESHOLD - 1, SURVIVAL_THRESHOLD, SURVIVAL_THRESHOLD + 1]
 if DONATION_BOX_HAS_LIMIT:
     common_pool_states = [0, 1, 2, DONATION_BOX_CAPACITY]

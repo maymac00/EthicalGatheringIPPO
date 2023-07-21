@@ -30,46 +30,76 @@ class CommonsGame(gym.Env):
     DONATE = 8
     TAKE_DONATION = 9
 
-    def __init__(self, numAgents, visualRadius, mapSketch, fullState, tabularState=True, agent_pos=[],
-                 weight_vector=[1.0, 0.0], normalized_obs=True, inequality_mode="tie_break"):
+    def __init__(self, n_agents, map_size=None, tabularState=True, agent_pos=[],
+                 we=0.0, normalized_obs=True, inequality_mode="tie_break", max_steps=500, apple_regen=0.05,
+                 past_actions_memory=0, visual_radius=2, partial_observability=False, donation_capacity=10,
+                 survival_threshold=10):
         super(CommonsGame, self).__init__()
-        self.fullState = fullState
+        self.fullState = not partial_observability
+        self.max_steps = max_steps
+        self.step_count = 0
         # Setup spaces
         self.action_space = spaces.Discrete(10)
-        obHeight = obWidth = visualRadius * 2 + 1
+        obHeight = obWidth = visual_radius * 2 + 1
         # Setup game
-        self.numAgents = numAgents
-        self.sightRadius = visualRadius
-        self.agentChars = agentChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[0:numAgents]
-        self.mapHeight = len(mapSketch)
-        self.mapWidth = len(mapSketch[0])
+        self.numAgents = n_agents
+        self.sightRadius = visual_radius
+        self.agentChars = agentChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[0:n_agents]
+
         self.tabularState = tabularState
         self.common_pool = True
         self.agent_pos = agent_pos
-        self.weight_vector = np.array(weight_vector)
+        self.weight_vector = np.array([1, we])
         self.normalized_obs = normalized_obs
-        self.currentStateInfo = {"apples": np.zeros(numAgents), "donationBox": 0}
+        self.currentStateInfo = {"apples": np.zeros(n_agents), "donationBox": 0}
         self.inequality_mode = inequality_mode
         # if tabularState:
         #    fullState = True
         #    self.fullState = True
 
-        if fullState:
+        constants.DONATION_BOX_CAPACITY = donation_capacity
+        constants.SURVIVAL_THRESHOLD = survival_threshold
+
+        # Load map
+        if map_size == 'tiny':
+            self.map2use = constants.tinyMap
+        elif map_size == 'small':
+            self.map2use = constants.smallMap
+        elif map_size == 'medium':
+            bigMap = np.array(constants.bigMap)
+            self.map2use = bigMap[:, :16]
+        else:
+            self.map2use = constants.bigMap
+
+        self.mapHeight = len(self.map2use)
+        self.mapWidth = len(self.map2use[0])
+
+        # Untracked parameters
+        constants.REGENERATION_PROBABILITY = apple_regen
+        self.inequality_mode = inequality_mode
+        self.past_actions_memory = past_actions_memory
+        self.visual_radius = visual_radius
+        self.partial_observability = partial_observability
+        pass
+
+        if self.fullState:
             self.observation_space = spaces.Box(low=0, high=255, shape=(self.mapHeight + 2, self.mapWidth + 2, 3),
                                                 dtype=np.uint8)
         else:
             self.observation_space = spaces.Box(low=0, high=255, shape=(obHeight, obWidth, 3), dtype=np.uint8)
-        self.numPadPixels = numPadPixels = visualRadius - 1
+        self.numPadPixels = numPadPixels = visual_radius - 1
 
-        self.gameField = buildMap(mapSketch, numPadPixels=numPadPixels, agentChars=agentChars,
+        self.gameField = buildMap(self.map2use, numPadPixels=numPadPixels, agentChars=agentChars,
                                   mandatory_initial_position=self.agent_pos)
 
         self.state = None
-        self.sick_probabilities = np.random.choice(100, numAgents)
-        self.efficiency_probabilites = np.random.randint(1, 5, numAgents)
+        self.sick_probabilities = np.random.choice(100, n_agents)
+        self.efficiency_probabilites = np.random.randint(1, 5, n_agents)
 
         # Pycolab related setup:
         self._game = self.buildGame()
+        # Awful workaround to make serializing work
+        self._game.backdrop.__dict__['_p_a_l_e_t_t_e'] = self._game.backdrop.__dict__['_p_a_l_e_t_t_e'].__dict__
         colourMap = dict([(a, (999 - 4 * i, 0, 4 * i)) for i, a in enumerate(agentChars)]  # Agents
                          + [('=', (705, 705, 705))]  # Steel Impassable wall
                          + [(' ', (0, 0, 0))]  # Black background
@@ -132,9 +162,11 @@ class CommonsGame(gym.Env):
             else:
                 a.set_init_apples(num_apples[i])
         self._game.things['@'].common_pool = common_pool
-
+        self.step_count = 0
         self.state, _, _ = self._game.its_showtime()
         nObservations, _ = self.getObservation()
+        # Awful workaround to make serializing work
+        self._game.backdrop.__dict__['_p_a_l_e_t_t_e'] = self._game.backdrop.__dict__['_p_a_l_e_t_t_e'].__dict__
         return nObservations
 
     def getBoard(self, partiall_observability=False, ag=0):
@@ -272,7 +304,7 @@ class CommonsGame(gym.Env):
         elif new_ob[-2] > constants.SURVIVAL_THRESHOLD:
             new_ob[-2] = 3
 
-        # common_pool_states = list(range(self.numAgents + 1)) + [constants.DONATION_BOX_CAPACITY]
+        # common_pool_states = list(range(self.n_agents + 1)) + [constants.DONATION_BOX_CAPACITY]
         common_pool_states = [0, 1, 2, constants.DONATION_BOX_CAPACITY]
         if new_ob[-1] < common_pool_states[-1]:
             new_ob[-1] = min(new_ob[-1], 2)
@@ -291,6 +323,9 @@ class CommonsGame(gym.Env):
             done = not (np.logical_or.reduce(self.state.layers['@'][self.sightRadius + 2:, :], axis=None))
         else:
             done = False
+
+        if self.step_count >= self.max_steps:
+            done = True
 
         ags = [self._game.things[c] for c in self.agentChars]
         obs = []
@@ -364,6 +399,8 @@ class CommonsGame(gym.Env):
                     obs.append(new_state)
                 else:
                     obs.append([])
+        if not isinstance(obs, np.ndarray):
+            obs = np.array(obs)
         return obs, done
 
     def get_agents(self):

@@ -425,6 +425,17 @@ class AppleDrape(pythings.Drape):
 
         appleIdxs = np.argwhere(np.logical_and(np.logical_xor(self.apples, self.curtain), agentsMap))
 
+        if constants.SUSTAINABILITY_MATTERS:
+            for i, j in appleIdxs:
+                self.curtain[i, j] = np.random.choice([True, False],
+                                                      p=[probs[i - self.numPadPixels - 1, j - self.numPadPixels - 1],
+                                                         1 - probs[
+                                                             i - self.numPadPixels - 1, j - self.numPadPixels - 1]])
+        else:
+            selection = self.curtain[appleIdxs[:, 0], appleIdxs[:, 1]]
+            self.curtain[appleIdxs[:, 0], appleIdxs[:, 1]] = np.random.binomial(1, constants.REGENERATION_PROBABILITY, selection.shape).astype("bool")
+            pass
+        """
         for i, j in appleIdxs:
             if constants.CREATING_MODEL:
                 pass
@@ -437,3 +448,4 @@ class AppleDrape(pythings.Drape):
             else:
                 self.curtain[i, j] = np.random.choice([True, False],
                                                       p=[constants.REGENERATION_PROBABILITY, 1 - constants.REGENERATION_PROBABILITY])
+        """
