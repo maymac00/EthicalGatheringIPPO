@@ -8,7 +8,7 @@ from pycolab import ascii_art
 from CommonsGame.utils import buildMap, ObservationToArrayWithRGB
 from CommonsGame.objects import PlayerSprite, AppleDrape, SightDrape, ShotDrape
 import CommonsGame.constants as constants
-import importlib
+plt.switch_backend('TkAgg')
 
 
 class CommonsGame(gym.Env):
@@ -59,6 +59,8 @@ class CommonsGame(gym.Env):
 
         constants.DONATION_BOX_CAPACITY = donation_capacity
         constants.SURVIVAL_THRESHOLD = survival_threshold
+        constants.REGENERATION_PROBABILITY = apple_regen
+        self.apple_regen = apple_regen
 
         # Load map
         if map_size == 'tiny':
@@ -75,7 +77,7 @@ class CommonsGame(gym.Env):
         self.mapWidth = len(self.map2use[0])
 
         # Untracked parameters
-        constants.REGENERATION_PROBABILITY = apple_regen
+
         self.inequality_mode = inequality_mode
         self.past_actions_memory = past_actions_memory
         self.visual_radius = visual_radius
@@ -123,7 +125,7 @@ class CommonsGame(gym.Env):
                 [(a, ascii_art.Partial(PlayerSprite, self.agentChars, self.sightRadius, self.agent_pos,
                                        inequality_mode=self.inequality_mode)) for a in
                  self.agentChars]),
-            drapes={'@': ascii_art.Partial(AppleDrape, self.agentChars, self.numPadPixels, apples_yes_or_not),
+            drapes={'@': ascii_art.Partial(AppleDrape, self.agentChars, self.numPadPixels, apples_yes_or_not, self.apple_regen),
                     '-': ascii_art.Partial(SightDrape, self.agentChars, self.numPadPixels),
                     '.': ascii_art.Partial(ShotDrape, self.agentChars, self.numPadPixels)},
             # update_schedule=['.'] + agentsOrder + ['-'] + ['@'],

@@ -231,12 +231,13 @@ class ShotDrape(pythings.Drape):
 class AppleDrape(pythings.Drape):
     """Coins Drap"""
 
-    def __init__(self, curtain, character, agentChars, numPadPixels, apples_yes_or_not):
+    def __init__(self, curtain, character, agentChars, numPadPixels, apples_yes_or_not, apple_regen):
         super().__init__(curtain, character)
         self.agentChars = agentChars
         self.numPadPixels = numPadPixels
         self.only_start = True
         self.agents_cannot_take = [False for _ in range(len(self.agentChars))]
+        self.apple_regen = apple_regen
 
         self.apples = np.copy(curtain)
         if self.only_start:
@@ -433,7 +434,7 @@ class AppleDrape(pythings.Drape):
                                                              i - self.numPadPixels - 1, j - self.numPadPixels - 1]])
         else:
             selection = self.curtain[appleIdxs[:, 0], appleIdxs[:, 1]]
-            self.curtain[appleIdxs[:, 0], appleIdxs[:, 1]] = np.random.binomial(1, constants.REGENERATION_PROBABILITY, selection.shape).astype("bool")
+            self.curtain[appleIdxs[:, 0], appleIdxs[:, 1]] = np.random.binomial(1, self.apple_regen, selection.shape).astype("bool")
             pass
         """
         for i, j in appleIdxs:
